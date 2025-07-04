@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section>
+  <article>
+    <h1>Make a reservation</h1>
+    <!--Begin row-->
+    <div class="row">
+      <!--Begin col-->
+      <div class="column">
+        <form id="booking-form" action="" method="post">
+          {% csrf_token %}
+          <p>
+            <label for="id_first_name">First name:</label>
+            <input type="text" name="first_name" id="id_first_name" required>
+          </p>
+          <p>
+            <label for="id_reservation_date">Reservation date:</label>
+            <input type="date" name="reservation_date" id="id_reservation_date" required>
+          </p>
+          <p>
+            <label for="id_reservation_slot">Reservation slot:</label>
+            <select name="reservation_slot" id="id_reservation_slot" required>
+              <option value="">Please select a time slot</option>
+              <option value="12:00-13:00">12:00-13:00</option>
+              <option value="13:00-14:00">13:00-14:00</option>
+              <option value="18:00-19:00">18:00-19:00</option>
+              <option value="19:00-20:00">19:00-20:00</option>
+            </select>
+          </p>
+          <!-- Hidden fields with default values -->
+          <input type="hidden" name="last_name" value="Guest">
+          <input type="hidden" name="guest_number" value="1">
+          <input type="hidden" name="comment" value="No special requests">
+          <input type="submit" id="button">
+        </form>
+      </div>
+      <!--End col-->
+
+      <!--Begin col-->
+      <div class="column">
+        <div class="videowrap">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d11898.289517452584!2d-87.60853049433447!3d41.79442860243028!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x880e2912ce6f7027%3A0xc0cfb5545d4a37b2!2sHyde%20Park%2C%20Chicago%2C%20IL%2C%20USA!5e0!3m2!1sen!2spt!4v1662384760663!5m2!1sen!2spt"
+            width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+      <!--End col-->
+    </div>
+    <!--End row-->
+
+    <script>
+    // Auto-select current date
+    window.onload = function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('id_reservation_date').value = today;
+      // Load booking data for current date
+      loadBookings(today);
+    };
+
+    // Refresh booking data when date changes
+    document.getElementById('id_reservation_date').addEventListener('change', function() {
+      const selectedDate = this.value;
+      loadBookings(selectedDate);
+    });
+
+    // Use fetch API to get booking data
+    function loadBookings(date) {
+      fetch(`/api/reservations/?date=${date}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            displayBookings(data);
+          } else {
+            console.error('Failed to get booking data:', data.message);
+          }
+        })
+        .catch(error => {
+          console.error('Request error:', error);
+        });
+    }
+
+    // Display booking data
+    function displayBookings(data) {
+      const bookingsContainer = document.getElementById('bookings-container');
+      if (!bookingsContainer) {
+        // Create container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'bookings-container';
+        container.innerHTML = '<h3>Today\'s Bookings</h3>';
+        document.querySelector('.column').appendChild(container);
+      }
+      
+      const container = document.getElementById('bookings-container');
+      if (data.bookings && data.bookings.length > 0) {
+        let html = '<h3>Today\'s Bookings</h3><ul>';
+        data.bookings.forEach(booking => {
+          html += `<li>${booking.first_name} - ${booking.reservation_slot}</li>`;
+        });
+        html += '</ul>';
+        container.innerHTML = html;
+      } else {
+        container.innerHTML = '<h3>Today\'s Bookings</h3><p>No Booking</p>';
+      }
+    }
+
+    // Handle form submission
+    document.getElementById('booking-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      
+      // Get CSRF token
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      
+      fetch('/book/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': csrfToken
+        }
+      })
+      .then(response => {
+        // Check response type
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return response.json();
+        } else {
+          // If not JSON, it might be an HTML error page
+          throw new Error('Server returned non-JSON response');
+        }
+      })
+      .then(data => {
+        if (data.success) {
+          alert(data.message);
+          // Refresh booking data
+          const selectedDate = document.getElementById('id_reservation_date').value;
+          loadBookings(selectedDate);
+          // Reset form
+          this.reset();
+          // Reset current date
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('id_reservation_date').value = today;
+        } else {
+          alert(data.message || 'Booking failed');
+        }
+      })
+      .catch(error => {
+        console.error('Submission error:', error);
+        alert('Submission failed, please try again');
+      });
+    });
+    </script>
+
+  </article>
+</section>
+{% endblock %}
